@@ -10,7 +10,13 @@ class SyswebHandler(BaseHTTPRequestHandler):
     def _set_headers(self, content_type='application/json'):
         self.send_response(200)
         self.send_header('Content-type', content_type)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
+
+    def do_OPTIONS(self):
+        self._set_headers()
 
     def do_GET(self):
         parsed_path = urlparse(self.path)

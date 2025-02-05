@@ -127,6 +127,16 @@
             const fetchPromises = endpoints.map(endpoint =>
                 fetch(endpoint)
                 .then(res => res.json())
+                .then(data => {
+                    // Add baseUrl to each service
+                    const baseUrl = endpoint.replace('/services', '');
+                    return {
+                        services: data.services.map(service => ({
+                            ...service,
+                            baseUrl: baseUrl
+                        }))
+                    };
+                })
                 .catch(err => {
                     console.error('Erro em ' + endpoint, err);
                     return { services: [] };
@@ -149,6 +159,7 @@
             let html = `<table>
                 <thead>
                     <tr>
+                        <th>Host</th>
                         <th>Unit</th>
                         <th>Load</th>
                         <th>Active</th>
@@ -159,18 +170,29 @@
                 </thead>
                 <tbody>`;
             services.forEach(s => {
+                // Extract hostname from baseUrl
+                let hostname = 'local';
+                if (s.baseUrl) {
+                    try {
+                        hostname = new URL(s.baseUrl).hostname || s.baseUrl;
+                    } catch {
+                        hostname = s.baseUrl.replace(/^https?:\/\//, '').split('/')[0];
+                    }
+                }
+                
                 html += `<tr>
+                    <td>${hostname}</td>
                     <td>${s.unit}</td>
                     <td>${s.load}</td>
                     <td>${s.active}</td>
                     <td>${s.sub}</td>
                     <td>${s.description}</td>
                     <td>
-                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'start')" title="Start"><i class="fa fa-play"></i></span>
-                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'stop')" title="Stop"><i class="fa fa-stop"></i></span>
-                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'restart')" title="Restart"><i class="fa fa-arrows-rotate"></i></span>
-                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'status')" title="Status"><i class="fa fa-circle-info"></i></span>
-                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="fetchLogs('${s.unit}')" title="Logs"><i class="fa fa-file-lines"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'start', '${s.baseUrl}')" title="Start"><i class="fa fa-play"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'stop', '${s.baseUrl}')" title="Stop"><i class="fa fa-stop"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'restart', '${s.baseUrl}')" title="Restart"><i class="fa fa-arrows-rotate"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'status', '${s.baseUrl}')" title="Status"><i class="fa fa-circle-info"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="fetchLogs('${s.unit}', '${s.baseUrl}')" title="Logs"><i class="fa fa-file-lines"></i></span>
                     </td>
                 </tr>`;
             });
@@ -184,8 +206,9 @@
             renderServices(filtered);
         }
 
-        function executeAction(service, action) {
-            fetch('/service', {
+        function executeAction(service, action, baseUrl = '') {
+            const endpoint = baseUrl ? `${baseUrl}/service` : '/service';
+            fetch(endpoint, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({service, action})
@@ -203,8 +226,9 @@
             });
         }
 
-        function fetchLogs(service) {
-            fetch('/logs?service=' + encodeURIComponent(service))
+        function fetchLogs(service, baseUrl = '') {
+            const endpoint = baseUrl ? `${baseUrl}/logs` : '/logs';
+            fetch(`${endpoint}?service=${encodeURIComponent(service)}`)
             .then(res => res.json())
             .then(result => {
                 const content = result.logs.join("\n");
