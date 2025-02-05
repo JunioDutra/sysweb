@@ -1,0 +1,13 @@
+[Unit]
+Description=Sysweb Server
+After=network.target
+
+[Service]
+#Use your own path of git cloned project
+ExecStart=/usr/bin/python3 /home/user/git/sysweb/server.py
+Restart=always
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
