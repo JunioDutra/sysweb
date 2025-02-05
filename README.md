@@ -2,6 +2,18 @@
 
 A minimalist Python project without external dependencies to control systemctl services and collect logs.
 
+## Menu
+
+- [API Endpoints Documentation](#api-endpoints-documentation)
+  - [GET /services](#get-services)
+  - [GET /logs](#get-logs)
+  - [POST /service](#post-service)
+- [Pages](#pages)
+  - [System Web Interface](#system-web)
+- [Running Instructions](#running-the-server)
+  - [Basic Setup](#running-the-server)
+  - [Service Setup](#running-the-server-as-a-service)
+
 ## API Endpoints Documentation
 
 ### GET /services
@@ -52,6 +64,34 @@ curl -X POST http://localhost:8000/service \
      -d '{"service": "nginx.service", "action": "restart"}'
 ```
 
+## Pages
+
+### System Web
+
+A web interface for managing system operations and configurations.
+
+#### Features
+
+- Service Management
+  - List all system services
+  - Filter services by name
+  - Service control actions:
+    - Start service
+    - Stop service
+    - Restart service
+    - View service status
+    - View service logs
+- API Management
+  - Add multiple API endpoints
+  - Remove API endpoints
+  - Persistent storage of API endpoints
+  - Automatic service discovery from multiple APIs
+
+#### Preview
+
+![System Web Interface](/assets/sysweb-preview.png)
+
+> Note: The preview image is a placeholder. Please replace it with an actual screenshot of your application.
 
 ## Running the Server
 
