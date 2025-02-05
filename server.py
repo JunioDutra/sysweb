@@ -14,7 +14,9 @@ class SyswebHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed_path = urlparse(self.path)
-        if parsed_path.path == '/services':
+        if parsed_path.path == "/":
+            self._serve_index()
+        elif parsed_path.path == '/services':
             self._list_services()
         elif parsed_path.path == '/logs':
             self._get_logs()
@@ -53,7 +55,6 @@ class SyswebHandler(BaseHTTPRequestHandler):
                 continue
             if ".service" not in line:
                 continue
-            
             unit = line[0:56].strip()
             load = line[56:63].strip()
             active = line[63:70].strip()
@@ -125,19 +126,29 @@ class SyswebHandler(BaseHTTPRequestHandler):
             parsed_url = urlparse(self.path)
             query_params = parse_qs(parsed_url.query)
             service_filter = query_params.get('service', [None])[0]
-            
             cmd = ['journalctl', '--no-pager', '-n', '100']
             if service_filter:
                 cmd.extend(['-u', service_filter])
-                
             output = subprocess.check_output(
                 cmd,
                 universal_newlines=True
             )
-            
             lines = [line.strip() for line in output.splitlines() if line.strip()]
             self._set_headers(content_type='application/json')
             self.wfile.write(json.dumps({'logs': lines}).encode())
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def _serve_index(self):
+        try:
+            path = os.path.join(os.path.dirname(__file__), "index.html")
+            with open(path, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
         except Exception as e:
             self.send_error(500, str(e))
 

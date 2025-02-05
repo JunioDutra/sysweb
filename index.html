@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sysweb - Controle de Serviços</title>
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <nav class="container">
+        <h1>Sysweb - Controle de Serviços</h1>
+    </nav>
+    <main class="container">
+        <section>
+            <h2>Lista de Serviços</h2>
+            <article>
+                <header>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong>APIs Base URLs</strong>
+                        <button onclick="loadServices()">Buscar</button>
+                    </div>
+                </header>
+                <div id="apisList"></div>
+            </article>
+            <fieldset class="grid" style="grid-template-columns: repeat(4, 1fr);">
+                <input 
+                    type="text" 
+                    id="apiInput" 
+                    name="apiInput"
+                    placeholder="Informe APIs separadas por vírgula"
+                    aria-label="APIs"
+                    style="grid-column: span 3;"
+                />
+                <button type="submit" onclick="addApis()">Add</button>
+            </fieldset>
+            <input type="text" id="filterInput" placeholder="Filtrar por nome do serviço" oninput="filterServices()">
+            <progress id="loadingIndicator" style="display:none;" max="100">Carregando...</progress>
+            <div id="servicesList"></div>
+        </section>
+    </main>
+    <dialog id="modal">
+      <article>
+        <header>
+          <button aria-label="Close" rel="prev" onclick="document.getElementById('modal').close()"></button>
+          <p><strong>Resultado da Ação</strong></p>
+        </header>
+        <pre id="modalContent"></pre>
+      </article>
+    </dialog>
+    <script>
+        let allServices = [];
+        let savedApis = new Set();
+        const STORAGE_KEY = 'sysweb_apis';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved APIs from localStorage
+            const savedApisJson = localStorage.getItem(STORAGE_KEY);
+            if (savedApisJson) {
+                const apis = JSON.parse(savedApisJson);
+                apis.forEach(api => savedApis.add(api));
+                renderApisList();
+            }
+
+            window.showModal = function(content) {
+                document.getElementById('modalContent').textContent = content;
+                document.getElementById('modal').showModal();
+            };
+
+            document.getElementById('apiInput').addEventListener('keydown', function(e) {
+                if(e.key === 'Enter') {
+                    addApis();
+                }
+            });
+        });
+
+        function addApis() {
+            const apiInput = document.getElementById('apiInput').value.trim();
+            if (!apiInput) return;
+
+            apiInput.split(',').forEach(api => {
+                savedApis.add(api.trim());
+            });
+            
+            // Save to localStorage
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(savedApis)));
+            
+            renderApisList();
+            document.getElementById('apiInput').value = '';
+        }
+
+        function renderApisList() {
+            const html = Array.from(savedApis).map(api => 
+                `<div style="display: flex; justify-content: space-between; align-items: center; margin: 0.5rem 0;">
+                    <span>${api}</span>
+                    <button class="outline secondary" onclick="removeApi('${api}')">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>`
+            ).join('');
+            
+            document.getElementById('apisList').innerHTML = html;
+        }
+
+        function removeApi(api) {
+            savedApis.delete(api);
+            // Update localStorage after removal
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(savedApis)));
+            renderApisList();
+        }
+
+        function loadServices() {
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            loadingIndicator.style.display = 'block';
+
+            const endpoints = Array.from(savedApis).map(url => {
+                if (!url.endsWith("/services")) {
+                    url = url.endsWith("/") ? url + "services" : url + "/services";
+                }
+                return url;
+            });
+
+            if (endpoints.length === 0) {
+                endpoints.push('/services');
+            }
+
+            const fetchPromises = endpoints.map(endpoint =>
+                fetch(endpoint)
+                .then(res => res.json())
+                .catch(err => {
+                    console.error('Erro em ' + endpoint, err);
+                    return { services: [] };
+                })
+            );
+
+            Promise.all(fetchPromises).then(results => {
+                allServices = results.reduce((acc, cur) => {
+                    if(cur.services && Array.isArray(cur.services)) {
+                        return acc.concat(cur.services);
+                    }
+                    return acc;
+                }, []);
+                renderServices(allServices);
+                loadingIndicator.style.display = 'none';
+            });
+        }
+
+        function renderServices(services) {
+            let html = `<table>
+                <thead>
+                    <tr>
+                        <th>Unit</th>
+                        <th>Load</th>
+                        <th>Active</th>
+                        <th>Sub</th>
+                        <th>Description</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            services.forEach(s => {
+                html += `<tr>
+                    <td>${s.unit}</td>
+                    <td>${s.load}</td>
+                    <td>${s.active}</td>
+                    <td>${s.sub}</td>
+                    <td>${s.description}</td>
+                    <td>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'start')" title="Start"><i class="fa fa-play"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'stop')" title="Stop"><i class="fa fa-stop"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'restart')" title="Restart"><i class="fa fa-arrows-rotate"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="executeAction('${s.unit}', 'status')" title="Status"><i class="fa fa-circle-info"></i></span>
+                        <span style="cursor:pointer; margin:0 0.2rem;" onclick="fetchLogs('${s.unit}')" title="Logs"><i class="fa fa-file-lines"></i></span>
+                    </td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('servicesList').innerHTML = html;
+        }
+
+        function filterServices() {
+            const filterText = document.getElementById('filterInput').value.toLowerCase();
+            const filtered = allServices.filter(s => s.unit.toLowerCase().includes(filterText));
+            renderServices(filtered);
+        }
+
+        function executeAction(service, action) {
+            fetch('/service', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({service, action})
+            })
+            .then(resp => resp.json())
+            .then(result => {
+                let content = action === 'status'
+                    ? JSON.stringify(result.result, null, 2)
+                    : result.result;
+                showModal(content);
+            })
+            .catch(err => {
+                console.error(err);
+                showModal('Erro: ' + err);
+            });
+        }
+
+        function fetchLogs(service) {
+            fetch('/logs?service=' + encodeURIComponent(service))
+            .then(res => res.json())
+            .then(result => {
+                const content = result.logs.join("\n");
+                showModal(content);
+            })
+            .catch(err => {
+                console.error(err);
+                showModal('Erro: ' + err);
+            });
+        }
+    </script>
+</body>
+</html>
