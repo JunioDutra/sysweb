@@ -51,28 +51,45 @@ class SyswebHandler(BaseHTTPRequestHandler):
     def _format_output(self, output: str) -> list:
         lines = output.splitlines()
         services = []
-        header_found = False
-        for line in lines:
-            if not header_found:
-                if "UNIT" in line and "LOAD" in line:
-                    header_found = True
+        
+        # Get header line and find column positions
+        header = next((line for line in lines if "UNIT" in line and "LOAD" in line), None)
+        if not header:
+            return services
+
+        # Find the starting index of each column from header
+        columns = {
+            'UNIT': header.find('UNIT'),
+            'LOAD': header.find('LOAD'),
+            'ACTIVE': header.find('ACTIVE'),
+            'SUB': header.find('SUB'),
+            'DESCRIPTION': header.find('DESCRIPTION')
+        }
+        
+        # Process only service lines
+        service_lines = [line for line in lines[1:] if '.service' in line]
+        
+        for line in service_lines:
+            # Skip empty lines or summary lines
+            if not line.strip() or "loaded units listed" in line:
                 continue
-            if line.strip() == "" or "loaded units listed" in line:
-                continue
-            if ".service" not in line:
-                continue
-            unit = line[0:56].strip()
-            load = line[56:63].strip()
-            active = line[63:70].strip()
-            sub = line[70:78].strip()
-            description = line[78:].strip()
-            services.append({
-                "unit": unit,
-                "load": load,
-                "active": active,
-                "sub": sub,
-                "description": description
-            })
+
+            # Split line based on column positions
+            unit = line[columns['UNIT']:columns['LOAD']].strip()
+            load = line[columns['LOAD']:columns['ACTIVE']].strip()
+            active = line[columns['ACTIVE']:columns['SUB']].strip()
+            sub = line[columns['SUB']:columns['DESCRIPTION']].strip()
+            description = line[columns['DESCRIPTION']:].strip()
+
+            if unit:  # Only add if unit name is not empty
+                services.append({
+                    "unit": unit,
+                    "load": load,
+                    "active": active,
+                    "sub": sub,
+                    "description": description
+                })
+
         return services
 
     def _service_action(self):
