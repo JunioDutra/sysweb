@@ -62,6 +62,17 @@
                 renderApisList();
             }
 
+            // Check URL parameters for initial filter
+            const urlParams = new URLSearchParams(window.location.search);
+            const serviceFilter = urlParams.get('service');
+            if (serviceFilter) {
+                document.getElementById('filterInput').value = serviceFilter;
+                loadServices(true); // true indicates it should apply filter after loading
+            } else {
+                // If no filter parameter, just load all services
+                loadServices();
+            }
+
             window.showModal = function(content) {
                 document.getElementById('modalContent').textContent = content;
                 document.getElementById('modal').showModal();
@@ -109,7 +120,8 @@
             renderApisList();
         }
 
-        function loadServices() {
+        // Modify loadServices to accept a parameter indicating whether to apply filter after loading
+        function loadServices(applyFilter = false) {
             const loadingIndicator = document.getElementById('loadingIndicator');
             loadingIndicator.style.display = 'block';
 
@@ -150,7 +162,13 @@
                     }
                     return acc;
                 }, []);
-                renderServices(allServices);
+                
+                if (applyFilter) {
+                    filterServices();
+                } else {
+                    renderServices(allServices);
+                }
+                
                 loadingIndicator.style.display = 'none';
             });
         }
